@@ -17,6 +17,10 @@ use tokio::time::{self, Duration};
 use validator::Validate;
 
 
+async fn hello_world() {
+    println!("Hello, world!")
+}
+
 #[derive(Clone)]
 struct AppState {
     db: PgPool,
@@ -35,4 +39,8 @@ async fn main(
     sqlx::migrate!().run(&db).await.expect("Migrations went wrong:(");
 
     let state = AppState::new(db);
+
+    let router = Router::new().route("/", get(hello_world)).with_state(state);
+
+    Ok(router.into())
 }
