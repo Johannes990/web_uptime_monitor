@@ -1,0 +1,10 @@
+{
+  "version": "0.7.3",
+  "migrations-dir": "web_uptime_monitor/migrations/20240210212907_init.sql",
+  "datasources": [
+    {
+      "name": "web_uptime_monitor",
+      "url": "postgresql://johannes:pass@localhost:5432/web_uptime_monitor"
+    }
+  ]
+}
