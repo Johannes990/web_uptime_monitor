@@ -12,7 +12,6 @@ use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde::__private::ser::serialize_tagged_newtype;
 use sqlx::PgPool;
 use tokio::time::{self, Duration};
 use validator::Validate;
