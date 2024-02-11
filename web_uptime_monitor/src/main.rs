@@ -12,9 +12,11 @@ use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde::__private::ser::serialize_tagged_newtype;
 use sqlx::PgPool;
 use tokio::time::{self, Duration};
 use validator::Validate;
+
 
 /*
 / error handling
@@ -42,13 +44,11 @@ impl AxumIntoResponse for ApiError {
     }
 }
 
-
 /*
 / monitoring is done by fetching a list of websites from
 / the database and sequentially sending HTTP requests to
 / them and recording results in postgres
  */
-
 #[derive(Deserialize, sqlx::FromRow, Validate)]
 struct Website {
     #[validate(url)]
@@ -80,7 +80,32 @@ async fn check_websites(db: PgPool) {
                 .unwrap();
         }
     }
+}
 
+/*
+/ our backend, create an initial route to add a URL
+/ to monitor. we use the Validate trait to
+/ automatically return an error if validation fails
+ */
+async fn create_website(
+    State(state): State<AppState>,
+    Form(new_website): Form<Website>,
+) -> Result<impl AxumIntoResponse, impl AxumIntoResponse> {
+    if new_website.validate().is_err() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Validation error: is your website a reachable URL?",
+        ));
+    }
+
+    sqlx::query("INSERT INTO websites (url, alias) VALUES ($1, $2)")
+        .bind(new_website.url)
+        .bind(new_website.alias)
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+    Ok(Redirect::to("/"))
 }
 
 async fn hello_world() {
