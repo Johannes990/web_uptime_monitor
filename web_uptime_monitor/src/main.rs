@@ -19,6 +19,23 @@ use validator::Validate;
 
 
 /*
+/ website info
+ */
+#[derive(Serialize, Validate)]
+struct WebsiteInfo {
+    #[validate(url)]
+    url: String,
+    alias: String,
+    data: Vec<WebsiteStats>,
+}
+
+#[derive(sqlx::FromRow, Serialize)]
+pub struct WebsiteStats {
+    time: DateTime<Utc>,
+    uptime_pct: Option<i16>,
+}
+
+/*
 / error handling
  */
 enum ApiError {
@@ -106,6 +123,31 @@ async fn create_website(
         .unwrap();
 
     Ok(Redirect::to("/"))
+}
+
+/*
+/ get a list of all the websites we're tracking and add
+/ them to a vector of website data. if there are no results
+/ askama will handle that automatically for us
+ */
+async fn get_websites(State(state): State<AppState>) -> Result<impl AskamaIntoResponse, ApiError> {
+    let websites = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites")
+        .fetch_all((&state.db))
+        .await?;
+
+    let mut logs = Vec::new();
+
+    for website in websites {
+        let data = get_daily_stats(&website.alias, &state.db).await?;
+
+        logs.push(WebsiteInfo {
+            url: website.url,
+            alias: website.alias,
+            data,
+        });
+    }
+
+    Ok(WebsiteLogs { logs })
 }
 
 async fn hello_world() {
