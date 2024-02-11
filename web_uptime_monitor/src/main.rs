@@ -16,10 +16,39 @@ use sqlx::PgPool;
 use tokio::time::{self, Duration};
 use validator::Validate;
 
+/*
+/ error handling
+ */
+enum ApiError {
+    SQL(sqlx::Error)
+}
 
-// monitoring is done by fetching a list of websites from
-// the database and sequentially sending HTTP requests to
-// them and recording results in postgres
+impl From<sqlx::Error> for ApiError {
+    fn from(e: sqlx::Error) -> Self {
+        Self::SQLError(e)
+    }
+}
+
+impl AxumIntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        match self {
+            Self::SQLError(e) => {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("SQL Error: {e}")
+                    ).into_response()
+            }
+        }
+    }
+}
+
+
+/*
+/ monitoring is done by fetching a list of websites from
+/ the database and sequentially sending HTTP requests to
+/ them and recording results in postgres
+ */
+
 #[derive(Deserialize, sqlx::FromRow, Validate)]
 struct Website {
     #[validate(url)]
