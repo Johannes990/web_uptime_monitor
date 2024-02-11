@@ -17,6 +17,43 @@ use tokio::time::{self, Duration};
 use validator::Validate;
 
 
+// monitoring is done by fetching a list of websites from
+// the database and sequentially sending HTTP requests to
+// them and recording results in postgres
+#[derive(Deserialize, sqlx::FromRow, Validate)]
+struct Website {
+    #[validate(url)]
+    url: String,
+    alias: String
+}
+
+async fn check_websites(db: PgPool) {
+    let mut interval = time::interval(Duration::from_secs(60));
+
+    loop {
+        interval.tick().await;
+
+        let ctx = Client::new();
+        let mut res = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites").fetch(&db);
+
+        while let Some(website) = res.next().await {
+            let website = website.unwrap();
+            let response = ctx.get(website.url).send().await.unwrap();
+
+            sqlx::query(
+                "INSERT INTO logs (website_alias, status)\
+                VALUES\
+                ((SELECT id FROM websites where alias = $1), $2)"
+            )
+                .bind(website.alias)
+                .bind(response.status().as_u16() as i16)
+                .execute(&db).await
+                .unwrap();
+        }
+    }
+
+}
+
 async fn hello_world() {
     println!("Hello, world!")
 }
