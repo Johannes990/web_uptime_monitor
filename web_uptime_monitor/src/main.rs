@@ -289,9 +289,9 @@ async fn get_website_by_alias(State(state): State<AppState>, Path(alias): Path<S
     let monthly_data = get_monthly_stats(&website.alias, &state.db).await?;
 
     let incidents = sqlx::query_as::<_, Incident>(
-        "SELECT logs.created_at AS time,\
-        logs.status FROM logs\
-        LEFT JOIN websites ON websites.id=logs.website_id\
+        "SELECT logs.created_at AS time,
+        logs.status FROM logs
+        LEFT JOIN websites ON websites.id=logs.website_id
         WHERE websites.alias=$1 AND logs.status!=200",
     )
     .bind(&alias)
