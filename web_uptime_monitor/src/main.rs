@@ -79,7 +79,7 @@ async fn check_websites(db: PgPool) {
         interval.tick().await;
 
         let ctx = Client::new();
-        let mut res = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites").fetch(&db);
+        let mut res = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites").fetch_all(&db);
 
         while let Some(website) = res.next().await {
             let website = website.unwrap();
@@ -131,7 +131,7 @@ async fn create_website(
  */
 async fn get_websites(State(state): State<AppState>) -> Result<impl AskamaIntoResponse, ApiError> {
     let websites = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites")
-        .fetch_all((&state.db))
+        .fetch_all(&state.db)
         .await?;
 
     let mut logs = Vec::new();
