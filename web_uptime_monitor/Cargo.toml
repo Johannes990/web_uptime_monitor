@@ -12,10 +12,10 @@ askama_axum = "0.4.0"
 askama = { version = "0.12.1", features = ["with-axum"] }
 chrono = { version = "0.4.33", features = ["clock", "serde"] }
 futures-util = "0.3.30"
-reqwest = "0.11.24"
+reqwest = "0.12.4"
 serde = { version = "1.0.196", features = ["derive"] }
-shuttle-runtime = "0.38.0"
-shuttle-axum = "0.38.0"
-shuttle-shared-db = { version = "0.38.0", features = ["sqlx", "postgres"] }
+shuttle-runtime = "0.43.0"
+shuttle-axum = "0.43.0"
+shuttle-shared-db = { version = "0.43.0", features = ["sqlx", "postgres"] }
 sqlx = { version = "0.7.3", features = ["runtime-tokio-rustls", "postgres", "macros", "chrono"] }
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { version = "0.18.1", features = ["derive"] }
