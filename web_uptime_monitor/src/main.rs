@@ -97,6 +97,11 @@ struct Website {
     alias: String
 }
 
+/*
+/ this function gathers data about our websites in the
+/ database and saves the data about websites to the
+/ logs table
+ */
 async fn check_websites(db: PgPool) {
     let mut interval = time::interval(Duration::from_secs(60));
 
@@ -128,10 +133,8 @@ async fn check_websites(db: PgPool) {
 / to monitor. we use the Validate trait to
 / automatically return an error if validation fails
  */
-async fn create_website(
-    State(state): State<AppState>,
-    Form(new_website): Form<Website>,
-) -> Result<impl AxumIntoResponse, impl AxumIntoResponse> {
+async fn create_website(State(state): State<AppState>, Form(new_website): Form<Website>)
+    -> Result<impl AxumIntoResponse, impl AxumIntoResponse> {
     if new_website.validate().is_err() {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -201,6 +204,10 @@ async fn get_daily_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>, 
     Ok(data)
 }
 
+/*
+/ this function is for returning the monthly
+/ stats for a website that's in the database
+ */
 async fn get_monthly_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>, ApiError> {
     let data = sqlx::query_as::<_, WebsiteStats>(
         r#"
@@ -224,13 +231,13 @@ async fn get_monthly_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>
     Ok(data)
 }
 
-fn fill_data_gaps(
-    mut data: Vec<WebsiteStats>,
-    splits: i32,
-    format: SplitBy,
-    no_of_seconds: i32
-) -> Vec<WebsiteStats> {
-    // if the length of data is not as long as the number of required splits (24)
+/*
+/ fill the data vector with default data
+/ if not enough data retrieved
+ */
+fn fill_data_gaps(mut data: Vec<WebsiteStats>, splits: i32, format: SplitBy, no_of_seconds: i32)
+    -> Vec<WebsiteStats> {
+    // if the length of data is not as long as the number of required splits
     // then we fill in the gaps
     if (data.len() as i32) < splits {
         // for each split, format the time and check if the timestamp exists
@@ -266,12 +273,10 @@ fn fill_data_gaps(
     data
 }
 
-async fn get_website_by_alias(
-    State(state): State<AppState>,
-    Path(alias): Path<String>,
-) -> Result<impl AskamaIntoResponse, ApiError> {
+async fn get_website_by_alias(State(state): State<AppState>, Path(alias): Path<String>)
+    -> Result<impl AskamaIntoResponse, ApiError> {
     let website = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites WHERE alias = $1")
-        .bind(alias)
+        .bind(&alias)
         .fetch_one(&state.db)
         .await?;
 
@@ -317,9 +322,8 @@ impl AppState {
 }
 
 #[shuttle_runtime::main]
-async fn main(
-    #[shuttle_shared_db::Postgres] db: PgPool
-) -> shuttle_axum::ShuttleAxum {
+async fn main(#[shuttle_shared_db::Postgres] db: PgPool)
+    -> shuttle_axum::ShuttleAxum {
     sqlx::migrate!().run(&db).await.expect("Migrations went wrong:(");
 
     let state = AppState::new(db);
