@@ -34,6 +34,20 @@ pub struct WebsiteStats {
     uptime_pct: Option<i16>,
 }
 
+#[derive(Serialize, sqlx::FromRow, Template)]
+#[template(path = "single_website.html")]
+struct SingleWebsiteLogs {
+    log: WebsiteInfo,
+    incidents: Vec<Incident>,
+    monthly_data: Vec<WebsiteStats>,
+}
+
+#[derive(sqlx::FromRow, Serialize)]
+pub struct Incident {
+    time: DateTime<Utc>,
+    statis: i16,
+}
+
 /*
 / error handling
  */
