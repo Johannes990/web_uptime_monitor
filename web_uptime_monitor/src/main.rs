@@ -41,6 +41,11 @@ enum ApiError {
     SQL(sqlx::Error)
 }
 
+enum SplitBy {
+    Hour,
+    Day
+}
+
 impl From<sqlx::Error> for ApiError {
     fn from(e: sqlx::Error) -> Self {
         Self::SQLError(e)
@@ -147,6 +152,76 @@ async fn get_websites(State(state): State<AppState>) -> Result<impl AskamaIntoRe
     }
 
     Ok(WebsiteLogs { logs })
+}
+
+/*
+/ function to get the daily stats of a website
+/ that's in our database
+ */
+async fn get_daily_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>, ApiError> {
+    let data = sqlx::query_as::<_, WebsiteStats>(
+        r#"
+        SELECT date_trunc('hour', created_at) AS time,
+        CAST(COUNT(CASE WHEN status=200 THEN 1 END) * 100 / COUNT(*) AS int2) AS uptime_pct
+        FROM logs
+        LEFT JOIN websites ON websites.id = logs.website_id
+        WHERE websites.alias = $1
+        GROUP BY time
+        ORDER BY time ASC
+        LIMIT 24
+        "#
+    )
+    .bind(alias)
+    .fetch_all(db).await?;
+
+    let no_of_splits = 24;
+    let no_of_seconds = 3600;
+
+    let data = fill_data_gaps(data, no_of_splits, SplitBy::Hour, no_of_seconds);
+
+    Ok(data)
+}
+
+fn fill_data_gaps(
+    mut data: Vec<WebsiteStats>,
+    splits: i32,
+    format: SplitBy,
+    no_of_seconds: i32
+) -> Vec<WebsiteStats> {
+    // if the length of data is not as long as the number of required splits (24)
+    // then we fill in the gaps
+    if (data.len() as i32) < splits {
+        // for each split, format the time and check if the timestamp exists
+        for i in 1..24 {
+            let time = Utc::now() - chrono::Duration::seconds((no_of_seconds * i).into());
+            let time = time
+                .with_minute(0)
+                .unwrap()
+                .with_second(0)
+                .unwrap()
+                .with_nanosecond(0)
+                .unwrap();
+
+            let time = if matches!(format, SplitBy::Day) {
+                time.with_hour(0).unwrap()
+            } else {
+                time
+            };
+
+            // if timestamp doesn't exist, push a timestamp woth None
+            if !data.iter().any(|x| x.time == time) {
+                data.push(WebsiteStats {
+                    time,
+                    uptime_pct: None,
+                });
+            }
+        }
+
+        // lastly, sort the data
+        data.sort_by(|a, b| b.time.cmp(&a.time));
+    }
+
+    data
 }
 
 async fn hello_world() {
