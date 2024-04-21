@@ -362,11 +362,20 @@ impl AppState {
 #[shuttle_runtime::main]
 async fn main(#[shuttle_shared_db::Postgres] db: PgPool)
     -> shuttle_axum::ShuttleAxum {
-    sqlx::migrate!().run(&db).await.expect("Migrations went wrong:(");
+    sqlx::migrate!().run(&db).await.unwrap();
 
-    let state = AppState::new(db);
+    let state = AppState::new(db.clone());
 
-    let router = Router::new().route("/", get(hello_world)).with_state(state);
+    tokio::spawn(async move {
+        check_websites(db).await;
+    });
+
+    let router = Router::new()
+        .route("/", get(get_websites))
+        .route("/websites", post(create_website))
+        .route("/websites/:alias", get(get_website_by_alias).delete(delete_website))
+        .route("/styles.css", get(styles))
+        .with_state(state);
 
     Ok(router.into())
 }
