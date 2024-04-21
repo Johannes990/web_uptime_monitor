@@ -28,6 +28,12 @@ struct WebsiteInfo {
     data: Vec<WebsiteStats>,
 }
 
+#[derive(Serialize, sqlx:FromRow, Template)]
+#[template(path = "index.html")]
+struct WebsiteLogs {
+    logs: Vec<WebsiteInfo>
+}
+
 #[derive(sqlx::FromRow, Serialize)]
 pub struct WebsiteStats {
     time: DateTime<Utc>,
@@ -190,8 +196,30 @@ async fn get_daily_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>, 
 
     let no_of_splits = 24;
     let no_of_seconds = 3600;
-
     let data = fill_data_gaps(data, no_of_splits, SplitBy::Hour, no_of_seconds);
+
+    Ok(data)
+}
+
+async fn get_monthly_stats(alias: &str, db: &PgPool) -> Result<Vec<WebsiteStats>, ApiError> {
+    let data = sqlx::query_as::<_, WebsiteStats>(
+        r#"
+        SELECT date_trunc('day', created_at) AS time,
+        CAST(COUNT(CASE WHEN status=200 THEN 1 END) * 100 / COUNT(*) AS int2) AS uptime_pct
+        FROM logs
+        LEFT JOIN websites ON websites.id=logs.website_id
+        WHERE websites.alias=$1
+        GROUP BY time
+        ORDER BY time ASC
+        LIMIT 30
+        "#
+    )
+        .bind(alias)
+        .fetch_all(db).await?;
+
+    let no_of_splits = 30;
+    let no_of_seconds = 86400;
+    let data = fill_data_gaps(data, no_of_splits, SplitBy::Day, no_of_seconds);
 
     Ok(data)
 }
@@ -236,6 +264,41 @@ fn fill_data_gaps(
     }
 
     data
+}
+
+async fn get_website_by_alias(
+    State(state): State<AppState>,
+    Path(alias): Path<String>,
+) -> Result<impl AskamaIntoResponse, ApiError> {
+    let website = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites WHERE alias = $1")
+        .bind(alias)
+        .fetch_one(&state.db)
+        .await?;
+
+    let last_24_hours_data = get_daily_stats(&website.alias, &state.db).await?;
+    let monthly_data = get_monthly_stats(&website.alias, &state.db).await?;
+
+    let incidents = sqlx::query_as::<_, Incident>(
+        "SELECT logs.created_at AS time,\
+        logs.status FROM logs\
+        LEFT JOIN websites ON websites.id=logs.website_id\
+        WHERE websites.alias=$1 AND logs.status!=200",
+    )
+    .bind(&alias)
+    .fetch_all(&state.db)
+    .await?;
+
+    let log = WebsiteInfo {
+        url: website.url,
+        alias,
+        data: last_24_hours_data,
+    };
+
+    Ok(SingleWebsiteLogs {
+        log,
+        incidents,
+        monthly_data,
+    })
 }
 
 async fn hello_world() {
