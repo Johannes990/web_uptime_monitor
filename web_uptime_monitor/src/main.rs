@@ -110,7 +110,7 @@ async fn check_websites(db: PgPool) {
         interval.tick().await;
 
         let ctx = Client::new();
-        let mut res = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites").fetch_all(&db);
+        let mut res = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites").fetch(&db);
 
         while let Some(website) = res.next().await {
             let website = website.unwrap();
