@@ -52,7 +52,7 @@ struct SingleWebsiteLogs {
 #[derive(sqlx::FromRow, Serialize)]
 pub struct Incident {
     time: DateTime<Utc>,
-    statis: i16,
+    status: i16,
 }
 
 /*
