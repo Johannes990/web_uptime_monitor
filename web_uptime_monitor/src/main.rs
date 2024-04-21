@@ -29,7 +29,7 @@ struct WebsiteInfo {
     data: Vec<WebsiteStats>,
 }
 
-#[derive(Serialize, sqlx:FromRow, Template)]
+#[derive(Serialize, sqlx::FromRow, Template)]
 #[template(path = "index.html")]
 struct WebsiteLogs {
     logs: Vec<WebsiteInfo>
