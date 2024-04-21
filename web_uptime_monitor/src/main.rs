@@ -13,6 +13,7 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use sqlx::postgres::any::AnyConnectionBackend;
 use tokio::time::{self, Duration};
 use validator::Validate;
 
@@ -58,7 +59,7 @@ pub struct Incident {
 / error handling
  */
 enum ApiError {
-    SQL(sqlx::Error)
+    SQLError(sqlx::Error)
 }
 
 enum SplitBy {
@@ -273,6 +274,10 @@ fn fill_data_gaps(mut data: Vec<WebsiteStats>, splits: i32, format: SplitBy, no_
     data
 }
 
+/*
+/ this function returns a log of website data
+/ for the website that matches the given alias
+ */
 async fn get_website_by_alias(State(state): State<AppState>, Path(alias): Path<String>)
     -> Result<impl AskamaIntoResponse, ApiError> {
     let website = sqlx::query_as::<_, Website>("SELECT url, alias FROM websites WHERE alias = $1")
@@ -304,6 +309,30 @@ async fn get_website_by_alias(State(state): State<AppState>, Path(alias): Path<S
         incidents,
         monthly_data,
     })
+}
+
+async fn delete_website(State(state): State<AppState>, Path(alias): Path<String>)
+    -> Result<impl AskamaIntoResponse, ApiError> {
+    let mut tx = state.db.begin().await?;
+
+    if let Err(e) = sqlx::query("DELETE FROM logs WHERE website_alias=$1")
+        .bind(&alias)
+        .execute(&mut *tx)
+        .await {
+        tx.rollback().await?;
+        return Err(ApiError::SQLError(e));
+    };
+
+    if let Err(e) = sqlx::query("DELETE FROM websites WHERE alias=$1")
+        .bind(&alias)
+        .execute(&mut *tx)
+        .await {
+        tx.rollback().await?;
+        return Err(ApiError::SQLError(e));
+    }
+
+    tx.commit().await?;
+    Ok(StatusCode::OK)
 }
 
 async fn hello_world() {
