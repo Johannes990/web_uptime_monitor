@@ -335,6 +335,15 @@ async fn delete_website(State(state): State<AppState>, Path(alias): Path<String>
     Ok(StatusCode::OK)
 }
 
+// assuming our style css lives at "templates/styles.css"
+async fn styles() -> impl AxumIntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/css")
+        .body(include_str!("../templates/styles.css").to_owned())
+        .unwrap()
+}
+
 async fn hello_world() {
     println!("Hello, world!")
 }
